@@ -37,10 +37,9 @@ Ultimately, Skill Swap fosters a decentralized learning environment driven by th
 > *(Include this section if you want to elaborate later)*
 
 - Frontend: React.js
-- Backend: Node.js / Express
+- Backend: Django
 - Database: MongoDB / PostgreSQL
 - Auth: JWT / OAuth
-- Deployment: Vercel / Heroku / Docker
 
 ---
 
