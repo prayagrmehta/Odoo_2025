@@ -1,12 +1,48 @@
-# React + Vite
+# Skill Swap Platform
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+## 🚀 Problem Statement
 
-Currently, two official plugins are available:
+The Skill Swap Platform aims to create a collaborative digital space where individuals can exchange skills and knowledge with one another. In a world where learning is continuous and diverse, many people have unique skills they’re willing to share — from programming and design to cooking and music — but lack access to formal educational channels or finances.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+This platform bridges that gap by allowing users to:
 
-## Expanding the ESLint configuration
+- Offer their skills in exchange for learning others.
+- Create and join interest-based groups.
+- Schedule sessions and track learning progress.
+- Build a portfolio of shared knowledge and contributions.
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+Ultimately, Skill Swap fosters a decentralized learning environment driven by the community.
+
+---
+
+## 👥 Team Name
+
+**Team 1854**
+
+---
+
+## 📧 Team Email Address
+
+**prayagrmehta.1011@gmail.com**
+
+---
+
+## 📂 Project Structure
+
+
+---
+
+## 🛠️ Tech Stack (Optional)
+
+> *(Include this section if you want to elaborate later)*
+
+- Frontend: React.js
+- Backend: Django
+- Database: MongoDB / PostgreSQL
+- Auth: JWT / OAuth
+
+---
+
+## 📌 License
+
+This project is for educational and non-commercial use only, as part of the Skill Swap hackathon or program.

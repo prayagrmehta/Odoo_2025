@@ -1,0 +1,50 @@
+<<<<<<< HEAD
+########################
+# Backend (Python/Django)
+########################
+
+backend/venv/
+backend/__pycache__/
+backend/*.pyc
+backend/db.sqlite3
+backend/.env
+backend/staticfiles/
+backend/media/
+
+########################
+# System / IDE
+########################
+
+*.log
+.DS_Store
+.vscode/
+=======
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+<<<<<<< HEAD
+>>>>>>> f0e4787 (Your commit message)
+=======
+>>>>>>> origin/neel
+>>>>>>> 7a51d2618c64254c96512761c01814724a81185c
