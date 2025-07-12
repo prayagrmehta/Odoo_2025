@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Container,
   Box,
@@ -16,9 +16,20 @@ import {
   IconButton,
   Snackbar,
   Alert as MuiAlert,
+  CircularProgress,
+  Tabs,
+  Tab,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField,
+  Rating as MuiRating,
 } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
-import { Home } from '@mui/icons-material';
+import { Home, Star } from '@mui/icons-material';
+import { useAuth } from '../context/AuthContext';
+import { swapAPI, notificationsAPI } from '../services/apiService';
 
 const mockProfilePhoto = 'https://i.pravatar.cc/40?img=3';
 
@@ -92,22 +103,75 @@ const mockRequests = [
 ];
 
 const statusColors = {
-  Pending: 'warning',
-  Accepted: 'success',
-  Rejected: 'error',
+  pending: 'warning',
+  accepted: 'success',
+  rejected: 'error',
+  completed: 'info',
 };
 
 const SwapRequests = () => {
+  const { user, isAuthenticated } = useAuth();
   const [filter, setFilter] = useState('All');
   const [page, setPage] = useState(1);
+  const [requests, setRequests] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState(0); // 0 = Received, 1 = Sent
+  const [ratingDialog, setRatingDialog] = useState({ open: false, swapId: null, otherUser: null });
+  const [ratingData, setRatingData] = useState({ rating: null, comment: '' });
   const requestsPerPage = 2;
   const navigate = useNavigate();
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
 
-  const filteredRequests =
-    filter === 'All'
-      ? mockRequests
-      : mockRequests.filter((req) => req.status === filter);
+  useEffect(() => {
+    if (!isAuthenticated()) {
+      navigate('/login');
+      return;
+    }
+    
+    loadSwapRequests();
+    // Mark notifications as read when user visits the swap requests page
+    markNotificationsAsRead();
+  }, [user]);
+
+  const markNotificationsAsRead = async () => {
+    try {
+      await notificationsAPI.markAllAsRead();
+    } catch (error) {
+      console.error('Failed to mark notifications as read:', error);
+    }
+  };
+
+  const handleTabChange = (event, newValue) => {
+    setActiveTab(newValue);
+    setPage(1); // Reset to first page when switching tabs
+  };
+
+  const loadSwapRequests = async () => {
+    try {
+      setLoading(true);
+      const userRequests = await swapAPI.getSwapRequests();
+      setRequests(userRequests.results || userRequests);
+    } catch (error) {
+      console.error('Failed to load swap requests:', error);
+      setSnackbar({ open: true, message: 'Failed to load swap requests', severity: 'error' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Separate received and sent requests
+  const receivedRequests = requests.filter(req => req.to_user.id === user.id);
+  const sentRequests = requests.filter(req => req.from_user.id === user.id);
+
+  // Filter based on active tab and status filter
+  const getFilteredRequests = () => {
+    const tabRequests = activeTab === 0 ? receivedRequests : sentRequests;
+    return filter === 'All' 
+      ? tabRequests 
+      : tabRequests.filter((req) => req.status === filter);
+  };
+
+  const filteredRequests = getFilteredRequests();
 
   const pageCount = Math.ceil(filteredRequests.length / requestsPerPage);
   const paginatedRequests = filteredRequests.slice(
@@ -115,13 +179,55 @@ const SwapRequests = () => {
     page * requestsPerPage
   );
 
-  const handleAccept = (id) => {
-    setSnackbar({ open: true, message: `Accepted request ${id}`, severity: 'success' });
-    // Implement accept logic here
+  const handleAccept = async (id) => {
+    try {
+      await swapAPI.acceptSwapRequest(id);
+      setSnackbar({ open: true, message: 'Request accepted successfully!', severity: 'success' });
+      loadSwapRequests(); // Reload the requests
+    } catch (error) {
+      setSnackbar({ open: true, message: 'Failed to accept request', severity: 'error' });
+    }
   };
-  const handleReject = (id) => {
-    setSnackbar({ open: true, message: `Rejected request ${id}`, severity: 'error' });
-    // Implement reject logic here
+
+  const handleReject = async (id) => {
+    try {
+      await swapAPI.rejectSwapRequest(id);
+      setSnackbar({ open: true, message: 'Request rejected', severity: 'info' });
+      loadSwapRequests(); // Reload the requests
+    } catch (error) {
+      setSnackbar({ open: true, message: 'Failed to reject request', severity: 'error' });
+    }
+  };
+
+  const handleComplete = async (id) => {
+    try {
+      await swapAPI.completeSwapRequest(id);
+      setSnackbar({ open: true, message: 'Swap marked as completed!', severity: 'success' });
+      loadSwapRequests(); // Reload the requests
+    } catch (error) {
+      setSnackbar({ open: true, message: 'Failed to complete swap', severity: 'error' });
+    }
+  };
+
+  const handleRate = (swapId, otherUser) => {
+    setRatingDialog({ open: true, swapId, otherUser });
+    setRatingData({ rating: null, comment: '' });
+  };
+
+  const handleRatingSubmit = async () => {
+    try {
+      await swapAPI.rateSwap(ratingDialog.swapId, ratingData);
+      setSnackbar({ open: true, message: 'Rating submitted successfully!', severity: 'success' });
+      setRatingDialog({ open: false, swapId: null, otherUser: null });
+      loadSwapRequests(); // Reload the requests
+    } catch (error) {
+      setSnackbar({ open: true, message: 'Failed to submit rating', severity: 'error' });
+    }
+  };
+
+  const handleRatingClose = () => {
+    setRatingDialog({ open: false, swapId: null, otherUser: null });
+    setRatingData({ rating: null, comment: '' });
   };
 
   return (
@@ -139,7 +245,7 @@ const SwapRequests = () => {
           >
             Home
           </Button>
-          <Avatar src={mockProfilePhoto} />
+          <Avatar src={user?.picture || mockProfilePhoto} />
         </Box>
       </Box>
       {/* Filter and search */}
@@ -155,68 +261,151 @@ const SwapRequests = () => {
             }}
           >
             <MenuItem value="All">All</MenuItem>
-            <MenuItem value="Pending">Pending</MenuItem>
-            <MenuItem value="Accepted">Accepted</MenuItem>
-            <MenuItem value="Rejected">Rejected</MenuItem>
+            <MenuItem value="pending">Pending</MenuItem>
+            <MenuItem value="accepted">Accepted</MenuItem>
+            <MenuItem value="rejected">Rejected</MenuItem>
+            <MenuItem value="completed">Completed</MenuItem>
           </Select>
         </FormControl>
         {/* Search bar placeholder (not functional for now) */}
         <Box sx={{ flex: 1 }} />
       </Box>
-      {/* Requests list */}
-      <Stack spacing={3}>
-        {paginatedRequests.map((req) => (
-          <Card key={req.id} sx={{ p: 2, display: 'flex', alignItems: 'center', borderRadius: 3, border: '1px solid #ccc' }}>
-            <Avatar sx={{ width: 64, height: 64, mr: 3 }} src={req.user.photo}>
-              {!req.user.photo && req.user.name.charAt(0)}
-            </Avatar>
-            <Box sx={{ flex: 1 }}>
-              <Typography variant="h6">{req.user.name}</Typography>
-              <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 1 }}>
-                <Typography variant="body2" color="text.secondary">Skills Offered:</Typography>
-                {req.user.skillsOffered.map((skill) => (
-                  <Chip key={skill} label={skill} color="primary" size="small" />
-                ))}
-              </Box>
-              <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 1 }}>
-                <Typography variant="body2" color="text.secondary">Skills Wanted:</Typography>
-                {req.user.skillsWanted.map((skill) => (
-                  <Chip key={skill} label={skill} color="secondary" size="small" variant="outlined" />
-                ))}
-              </Box>
-              <Typography variant="body2" color="text.secondary">rating: {req.user.rating}/5</Typography>
-            </Box>
-            <Box sx={{ minWidth: 120, textAlign: 'center' }}>
-              <Typography variant="body2" sx={{ mb: 1 }}>Status</Typography>
-              <Chip
-                label={req.status}
-                color={statusColors[req.status]}
-                sx={{ mb: 1, fontWeight: 600 }}
-              />
-              {req.status === 'Pending' && (
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mt: 1 }}>
-                  <Button
-                    variant="contained"
-                    color="success"
-                    size="small"
-                    onClick={() => handleAccept(req.id)}
-                  >
-                    Accept
-                  </Button>
-                  <Button
-                    variant="contained"
-                    color="error"
-                    size="small"
-                    onClick={() => handleReject(req.id)}
-                  >
-                    Reject
-                  </Button>
-                </Box>
-              )}
-            </Box>
-          </Card>
-        ))}
-      </Stack>
+
+      {/* Tabs for Received vs Sent */}
+      <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
+        <Tabs value={activeTab} onChange={handleTabChange} aria-label="swap request tabs">
+          <Tab 
+            label={`Received (${filter === 'All' ? receivedRequests.length : receivedRequests.filter(req => req.status === filter).length})`} 
+            id="tab-0"
+            aria-controls="tabpanel-0"
+          />
+          <Tab 
+            label={`Sent (${filter === 'All' ? sentRequests.length : sentRequests.filter(req => req.status === filter).length})`} 
+            id="tab-1"
+            aria-controls="tabpanel-1"
+          />
+        </Tabs>
+      </Box>
+            {/* Requests list */}
+      {loading ? (
+        <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+          <CircularProgress />
+        </Box>
+      ) : (
+        <Stack spacing={3}>
+          {paginatedRequests.length === 0 ? (
+            <Typography color="text.secondary" textAlign="center" sx={{ py: 4 }}>
+              {activeTab === 0 
+                ? 'No received swap requests found.' 
+                : 'No sent swap requests found.'
+              }
+            </Typography>
+          ) : (
+            paginatedRequests.map((req) => {
+              const isReceived = req.to_user.id === user.id;
+              const otherUser = isReceived ? req.from_user : req.to_user;
+              
+              return (
+                <Card key={req.id} sx={{ p: 2, display: 'flex', alignItems: 'center', borderRadius: 3, border: '1px solid #ccc' }}>
+                  <Avatar sx={{ width: 64, height: 64, mr: 3 }} src={otherUser.photo}>
+                    {!otherUser.photo && otherUser.username.charAt(0).toUpperCase()}
+                  </Avatar>
+                  <Box sx={{ flex: 1 }}>
+                    <Typography variant="h6" sx={{ mb: 1 }}>
+                      {otherUser.first_name} {otherUser.last_name}
+                    </Typography>
+                    <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 1 }}>
+                      <Typography variant="body2" color="text.secondary">
+                        {isReceived ? "They offer:" : "You offer:"}
+                      </Typography>
+                      {req.skills_offered.map((skill) => (
+                        <Chip key={skill.id} label={skill.name} color="primary" size="small" />
+                      ))}
+                    </Box>
+                    <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 1 }}>
+                      <Typography variant="body2" color="text.secondary">
+                        {isReceived ? "They want:" : "You want:"}
+                      </Typography>
+                      {req.skills_wanted.map((skill) => (
+                        <Chip key={skill.id} label={skill.name} color="secondary" size="small" variant="outlined" />
+                      ))}
+                    </Box>
+                    {req.message && (
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                        Message: {req.message}
+                      </Typography>
+                    )}
+                    <Typography variant="body2" color="text.secondary">Rating: {otherUser.rating}/5</Typography>
+                  </Box>
+                  <Box sx={{ minWidth: 120, textAlign: 'center' }}>
+                    <Typography variant="body2" sx={{ mb: 1 }}>Status</Typography>
+                    <Chip
+                      label={req.status}
+                      color={statusColors[req.status]}
+                      sx={{ mb: 1, fontWeight: 600 }}
+                    />
+                    {req.status === 'pending' && isReceived && (
+                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mt: 1 }}>
+                        <Button
+                          variant="contained"
+                          color="success"
+                          size="small"
+                          onClick={() => handleAccept(req.id)}
+                        >
+                          Accept
+                        </Button>
+                        <Button
+                          variant="contained"
+                          color="error"
+                          size="small"
+                          onClick={() => handleReject(req.id)}
+                        >
+                          Reject
+                        </Button>
+                      </Box>
+                    )}
+                    {req.status === 'accepted' && (
+                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mt: 1 }}>
+                        <Button
+                          variant="contained"
+                          color="primary"
+                          size="small"
+                          onClick={() => handleComplete(req.id)}
+                        >
+                          Mark Complete
+                        </Button>
+                      </Box>
+                    )}
+                    {req.status === 'completed' && req.can_rate && (
+                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mt: 1 }}>
+                        <Button
+                          variant="contained"
+                          color="secondary"
+                          size="small"
+                          startIcon={<Star />}
+                          onClick={() => handleRate(req.id, otherUser)}
+                        >
+                          Rate User
+                        </Button>
+                      </Box>
+                    )}
+                    {req.status === 'completed' && !req.can_rate && (
+                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mt: 1 }}>
+                        <Chip
+                          label="Already Rated"
+                          color="default"
+                          size="small"
+                          variant="outlined"
+                        />
+                      </Box>
+                    )}
+                  </Box>
+                </Card>
+              );
+            })
+          )}
+        </Stack>
+      )}
       {/* Pagination */}
       <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
         <Pagination
@@ -236,6 +425,49 @@ const SwapRequests = () => {
           {snackbar.message}
         </MuiAlert>
       </Snackbar>
+
+      {/* Rating Dialog */}
+      <Dialog open={ratingDialog.open} onClose={handleRatingClose} maxWidth="sm" fullWidth>
+        <DialogTitle>
+          Rate {ratingDialog.otherUser?.first_name || 'User'}
+        </DialogTitle>
+        <DialogContent>
+          <Box sx={{ py: 2 }}>
+            <Typography variant="body1" sx={{ mb: 2 }}>
+              How would you rate your experience with this skill swap?
+            </Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
+              <Typography variant="body2">Rating:</Typography>
+              <MuiRating
+                value={ratingData.rating}
+                onChange={(event, newValue) => {
+                  setRatingData({ ...ratingData, rating: newValue });
+                }}
+                size="large"
+              />
+            </Box>
+            <TextField
+              fullWidth
+              multiline
+              rows={3}
+              label="Comment (optional)"
+              value={ratingData.comment}
+              onChange={(e) => setRatingData({ ...ratingData, comment: e.target.value })}
+              placeholder="Share your experience with this skill swap..."
+            />
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleRatingClose}>Cancel</Button>
+          <Button 
+            onClick={handleRatingSubmit} 
+            variant="contained" 
+            disabled={!ratingData.rating}
+          >
+            Submit Rating
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Container>
   );
 };

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   AppBar,
   Toolbar,
@@ -16,6 +16,7 @@ import {
   ListItem,
   ListItemText,
   ListItemIcon,
+  Badge,
 } from '@mui/material';
 import {
   Menu as MenuIcon,
@@ -26,23 +27,68 @@ import {
   AdminPanelSettings,
   Logout,
   Login,
+  Notifications,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+import { notificationsAPI } from '../services/apiService';
 
 const Header = () => {
   const [anchorEl, setAnchorEl] = useState(null);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [notifications, setNotifications] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const navigate = useNavigate();
+  const { user, logout, isAuthenticated } = useAuth();
 
-  // Mock user state - replace with actual auth state
-  const [user, setUser] = useState({
-    name: 'John Doe',
-    email: 'john@example.com',
-    avatar: null,
-    isAdmin: false,
-  });
+  // Load notifications when user is authenticated
+  useEffect(() => {
+    if (isAuthenticated()) {
+      loadNotifications();
+    }
+  }, [isAuthenticated]);
+
+  // Refresh notifications when component becomes visible (user returns to page)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden && isAuthenticated()) {
+        loadNotifications();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [isAuthenticated]);
+
+  const loadNotifications = async () => {
+    try {
+      const userNotifications = await notificationsAPI.getNotifications();
+      setNotifications(userNotifications);
+      const unread = userNotifications.filter(n => !n.read).length;
+      setUnreadCount(unread);
+    } catch (error) {
+      console.error('Failed to load notifications:', error);
+    }
+  };
+
+  const handleNotificationClick = async () => {
+    try {
+      // Mark all notifications as read when user clicks on notification icon
+      if (unreadCount > 0) {
+        await notificationsAPI.markAllAsRead();
+        setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+        setUnreadCount(0);
+      }
+      navigate('/notifications'); // Change route to notifications
+    } catch (error) {
+      console.error('Failed to mark notifications as read:', error);
+      navigate('/notifications');
+    }
+  };
 
   const handleProfileMenuOpen = (event) => {
     setAnchorEl(event.currentTarget);
@@ -57,7 +103,7 @@ const Header = () => {
   };
 
   const handleLogout = () => {
-    setUser(null);
+    logout();
     handleMenuClose();
     navigate('/');
   };
@@ -65,9 +111,11 @@ const Header = () => {
   const menuItems = [
     { text: 'Home', icon: <Home />, path: '/' },
     { text: 'Browse Skills', icon: <Search />, path: '/browse' },
-    { text: 'Dashboard', icon: <Dashboard />, path: '/dashboard' },
-    { text: 'Swap Requests', icon: <Dashboard />, path: '/swap-requests' },
-    { text: 'Profile', icon: <Person />, path: '/profile' },
+    ...(isAuthenticated() ? [
+      { text: 'Dashboard', icon: <Dashboard />, path: '/dashboard' },
+      { text: 'Swap Requests', icon: <Dashboard />, path: '/swap-requests' },
+      { text: 'Profile', icon: <Person />, path: '/profile' },
+    ] : []),
     ...(user?.isAdmin ? [{ text: 'Admin Panel', icon: <AdminPanelSettings />, path: '/admin' }] : []),
   ];
 
@@ -127,27 +175,37 @@ const Header = () => {
               <Button color="inherit" onClick={() => navigate('/browse')}>
                 Browse Skills
               </Button>
-              {user && (
+              {isAuthenticated() && (
                 <Button color="inherit" onClick={() => navigate('/dashboard')}>
                   Dashboard
                 </Button>
               )}
-              {user && (
+              {isAuthenticated() && (
                 <Button color="inherit" onClick={() => navigate('/swap-requests')}>Swap Requests</Button>
               )}
             </Box>
           )}
 
-          {user ? (
+          {isAuthenticated() ? (
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <IconButton
+                color="inherit"
+                onClick={handleNotificationClick}
+                sx={{ position: 'relative' }}
+              >
+                <Badge badgeContent={unreadCount} color="error">
+                  <Notifications />
+                </Badge>
+              </IconButton>
               <Typography variant="body2" sx={{ display: { xs: 'none', sm: 'block' } }}>
-                {user.name}
+                {user.name || user.email || 'User'}
               </Typography>
               <Avatar
                 sx={{ width: 32, height: 32, cursor: 'pointer' }}
                 onClick={handleProfileMenuOpen}
+                src={user.photo}
               >
-                {user.avatar ? user.avatar : user.name.charAt(0)}
+                {user.photo ? null : (user.name ? user.name.charAt(0) : (user.email ? user.email.charAt(0) : 'U'))}
               </Avatar>
             </Box>
           ) : (

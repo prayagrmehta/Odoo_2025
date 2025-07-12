@@ -57,21 +57,21 @@ const Home = () => {
 
   const testimonials = [
     {
-      name: 'Sarah Johnson',
+      name: 'Prayag Mehta',
+      role: 'Security Engineer',
+      content: 'Skill Swap helped me share my security knowledge and learn new tech skills from others. Highly recommended!',
+      rating: 5,
+    },
+    {
+      name: 'Neel Ganatra',
       role: 'Web Developer',
-      content: 'I learned photography from a professional while teaching them React. Amazing experience!',
+      content: 'I exchanged web development tips and learned design from the community. The platform is awesome!',
       rating: 5,
     },
     {
-      name: 'Mike Chen',
-      role: 'Designer',
-      content: 'Found my perfect language exchange partner here. Now I\'m fluent in Spanish!',
-      rating: 5,
-    },
-    {
-      name: 'Emma Davis',
-      role: 'Student',
-      content: 'The skill verification system gives me confidence in finding quality teachers.',
+      name: 'Lakshya Mehta',
+      role: 'AI-ML Developer',
+      content: 'A great place to connect, teach, and learn. The skill exchange process is smooth and fun!',
       rating: 5,
     },
   ];

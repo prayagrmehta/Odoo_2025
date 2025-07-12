@@ -1,672 +1,712 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
-  Container,
-  Grid,
-  Card,
-  CardContent,
-  Typography,
   Box,
-  Button,
+  Drawer,
+  List,
+  ListItem,
+  ListItemIcon,
+  ListItemText,
+  Toolbar,
+  Typography,
+  AppBar,
+  CssBaseline,
+  Divider,
+  Container,
+  Paper,
   Table,
   TableBody,
   TableCell,
   TableContainer,
   TableHead,
   TableRow,
-  Paper,
-  Chip,
   Avatar,
+  Chip,
   IconButton,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  TextField,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
   Stack,
-  Divider,
+  TextField,
+  CircularProgress,
+  Snackbar,
   Alert,
-  Badge,
-  Tab,
-  Tabs,
-  List,
-  ListItem,
-  ListItemText,
-  ListItemAvatar,
-  Switch,
-  FormControlLabel,
+  Button,
+  MenuItem,
 } from '@mui/material';
 import {
   People,
   SwapHoriz,
   Warning,
-  Block,
-  CheckCircle,
-  Cancel,
-  Message,
-  Download,
   Analytics,
   AdminPanelSettings,
-  Visibility,
-  VisibilityOff,
-  Send,
-  Delete,
-  Edit,
+  Message,
+  Download,
   Star,
+  CheckCircle,
+  Block,
+  Edit,
+  Search as SearchIcon,
 } from '@mui/icons-material';
+import { adminAPI } from '../services/apiService';
+
+const drawerWidth = 240;
+
+const sections = [
+  { label: 'User Management', icon: <People /> },
+  { label: 'Skill Moderation', icon: <Warning /> },
+  { label: 'Swap Monitoring', icon: <SwapHoriz /> },
+  { label: 'Platform Messages', icon: <Message /> },
+  { label: 'Reports', icon: <Download /> },
+];
 
 const AdminPanel = () => {
-  const [tabValue, setTabValue] = useState(0);
-  const [openUserDialog, setOpenUserDialog] = useState(false);
-  const [openMessageDialog, setOpenMessageDialog] = useState(false);
-  const [selectedUser, setSelectedUser] = useState(null);
-  const [messageContent, setMessageContent] = useState('');
+  const [selectedSection, setSelectedSection] = useState(0);
+  // User Management state
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [search, setSearch] = useState('');
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
+  const [unauthorized, setUnauthorized] = useState(false);
 
-  // Mock data
-  const stats = [
-    { title: 'Total Users', value: 1247, icon: <People />, color: 'primary.main' },
-    { title: 'Active Swaps', value: 89, icon: <SwapHoriz />, color: 'success.main' },
-    { title: 'Pending Reviews', value: 12, icon: <Warning />, color: 'warning.main' },
-    { title: 'Banned Users', value: 3, icon: <Block />, color: 'error.main' },
-  ];
+  // Skill Moderation state
+  const [skills, setSkills] = useState([]);
+  const [skillsLoading, setSkillsLoading] = useState(false);
+  const [skillSearch, setSkillSearch] = useState('');
+  const [skillSnackbar, setSkillSnackbar] = useState({ open: false, message: '', severity: 'success' });
 
-  const users = [
-    {
-      id: 1,
-      name: 'John Doe',
-      email: 'john@example.com',
-      status: 'active',
-      joinDate: '2024-01-15',
-      totalSwaps: 24,
-      rating: 4.8,
-      isBanned: false,
-    },
-    {
-      id: 2,
-      name: 'Sarah Johnson',
-      email: 'sarah@example.com',
-      status: 'pending_review',
-      joinDate: '2024-01-20',
-      totalSwaps: 0,
-      rating: 0,
-      isBanned: false,
-    },
-    {
-      id: 3,
-      name: 'Mike Chen',
-      email: 'mike@example.com',
-      status: 'active',
-      joinDate: '2024-01-10',
-      totalSwaps: 15,
-      rating: 4.6,
-      isBanned: false,
-    },
-    {
-      id: 4,
-      name: 'Spam User',
-      email: 'spam@example.com',
-      status: 'banned',
-      joinDate: '2024-01-25',
-      totalSwaps: 0,
-      rating: 0,
-      isBanned: true,
-    },
-  ];
+  // Swap Monitoring state
+  const [swaps, setSwaps] = useState([]);
+  const [swapsLoading, setSwapsLoading] = useState(false);
+  const [swapStatus, setSwapStatus] = useState('');
+  const [swapSnackbar, setSwapSnackbar] = useState({ open: false, message: '', severity: 'success' });
 
-  const pendingSwaps = [
-    {
-      id: 1,
-      user1: 'John Doe',
-      user2: 'Sarah Johnson',
-      skill1: 'JavaScript',
-      skill2: 'Photography',
-      status: 'pending',
-      date: '2024-01-25',
-    },
-    {
-      id: 2,
-      user1: 'Mike Chen',
-      user2: 'Emma Davis',
-      skill1: 'Python',
-      skill2: 'Spanish',
-      status: 'accepted',
-      date: '2024-01-24',
-    },
-    {
-      id: 3,
-      user1: 'Alex Thompson',
-      user2: 'Lisa Wang',
-      skill1: 'Guitar',
-      skill2: 'Cooking',
-      status: 'cancelled',
-      date: '2024-01-23',
-    },
-  ];
+  // Platform Messages state
+  const [messageTitle, setMessageTitle] = useState('');
+  const [messageBody, setMessageBody] = useState('');
+  const [sendingMessage, setSendingMessage] = useState(false);
+  const [messageSnackbar, setMessageSnackbar] = useState({ open: false, message: '', severity: 'success' });
 
-  const reports = [
-    {
-      id: 1,
-      type: 'inappropriate_content',
-      reporter: 'John Doe',
-      reportedUser: 'Spam User',
-      description: 'User posted inappropriate skill descriptions',
-      status: 'resolved',
-      date: '2024-01-25',
-    },
-    {
-      id: 2,
-      type: 'spam',
-      reporter: 'Sarah Johnson',
-      reportedUser: 'Spam User',
-      description: 'Multiple spam messages sent',
-      status: 'pending',
-      date: '2024-01-24',
-    },
-  ];
+  // Reports state
+  const [downloadingReport, setDownloadingReport] = useState('');
+  const [reportsSnackbar, setReportsSnackbar] = useState({ open: false, message: '', severity: 'success' });
 
-  const platformMessages = [
-    {
-      id: 1,
-      title: 'New Feature: Skill Verification',
-      content: 'We\'ve added a new skill verification system to ensure quality exchanges.',
-      date: '2024-01-25',
-      sent: true,
-    },
-    {
-      id: 2,
-      title: 'Scheduled Maintenance',
-      content: 'Platform will be down for maintenance on Sunday, 2-4 AM EST.',
-      date: '2024-01-26',
-      sent: false,
-    },
-  ];
+  useEffect(() => {
+    if (selectedSection === 0) {
+      fetchUsers();
+    }
+    if (selectedSection === 1) {
+      fetchSkills();
+    }
+    if (selectedSection === 2) {
+      fetchSwaps();
+    }
+    // eslint-disable-next-line
+  }, [selectedSection]);
 
-  const handleTabChange = (event, newValue) => {
-    setTabValue(newValue);
-  };
-
-  const handleUserAction = (userId, action) => {
-    console.log(`${action} user ${userId}`);
-    // Implement user action logic
-  };
-
-  const handleSendMessage = () => {
-    console.log('Sending platform message:', messageContent);
-    setMessageContent('');
-    setOpenMessageDialog(false);
-  };
-
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'active':
-        return 'success';
-      case 'pending_review':
-        return 'warning';
-      case 'banned':
-        return 'error';
-      default:
-        return 'default';
+  const fetchUsers = async (searchTerm = '') => {
+    setLoading(true);
+    try {
+      const data = await adminAPI.getAllUsers(searchTerm);
+      if (data && data.error === 'Unauthorized access') {
+        setUnauthorized(true);
+        setUsers([]);
+      } else {
+        setUsers(data);
+      }
+    } catch (err) {
+      setUnauthorized(true);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const getSwapStatusColor = (status) => {
-    switch (status) {
-      case 'accepted':
-        return 'success';
-      case 'pending':
-        return 'warning';
-      case 'cancelled':
-        return 'error';
-      default:
-        return 'default';
+  const handleBanToggle = async (userId, isBanned) => {
+    try {
+      await adminAPI.toggleUserBan(userId, isBanned);
+      setSnackbar({ open: true, message: `User ${isBanned ? 'banned' : 'unbanned'} successfully!`, severity: 'success' });
+      fetchUsers(search);
+    } catch (err) {
+      setSnackbar({ open: true, message: 'Failed to update user status', severity: 'error' });
     }
   };
 
-  return (
-    <Container maxWidth="lg" sx={{ py: 4 }}>
-      {/* Header */}
-      <Box sx={{ mb: 4 }}>
-        <Typography variant="h4" component="h1" gutterBottom sx={{ fontWeight: 600 }}>
-          Admin Panel
-        </Typography>
-        <Typography variant="body1" color="text.secondary">
-          Manage users, monitor swaps, and maintain platform quality
-        </Typography>
+  const fetchSkills = async (searchTerm = '') => {
+    setSkillsLoading(true);
+    try {
+      const data = await adminAPI.getAllSkills(searchTerm);
+      setSkills(data);
+    } catch (err) {
+      setSkillSnackbar({ open: true, message: 'Failed to load skills', severity: 'error' });
+    } finally {
+      setSkillsLoading(false);
+    }
+  };
+
+  const handleRejectSkill = async (skillId) => {
+    try {
+      await adminAPI.deleteSkill(skillId);
+      setSkillSnackbar({ open: true, message: 'Skill rejected (deleted) successfully!', severity: 'success' });
+      fetchSkills(skillSearch);
+    } catch (err) {
+      setSkillSnackbar({ open: true, message: 'Failed to reject skill', severity: 'error' });
+    }
+  };
+
+  const fetchSwaps = async (status = '') => {
+    setSwapsLoading(true);
+    try {
+      const data = await adminAPI.getAllSwaps(status);
+      setSwaps(data);
+    } catch (err) {
+      setSwapSnackbar({ open: true, message: 'Failed to load swaps', severity: 'error' });
+    } finally {
+      setSwapsLoading(false);
+    }
+  };
+
+  const handleStatusFilter = (e) => {
+    setSwapStatus(e.target.value);
+    fetchSwaps(e.target.value);
+  };
+
+  const handleSendPlatformMessage = async () => {
+    if (!messageTitle.trim() || !messageBody.trim()) {
+      setMessageSnackbar({ open: true, message: 'Please fill in both title and message', severity: 'error' });
+      return;
+    }
+
+    setSendingMessage(true);
+    try {
+      const response = await adminAPI.sendPlatformMessage({
+        title: messageTitle.trim(),
+        message: messageBody.trim()
+      });
+
+      // Check for unauthorized access error from backend
+      if (response && response.error === 'Unauthorized access') {
+        setUnauthorized(true);
+        return;
+      }
+
+      setMessageSnackbar({ 
+        open: true, 
+        message: `Message sent successfully to ${response.users_notified} users!`, 
+        severity: 'success' 
+      });
+
+      // Clear the form
+      setMessageTitle('');
+      setMessageBody('');
+    } catch (err) {
+      setMessageSnackbar({ 
+        open: true, 
+        message: 'Failed to send platform message', 
+        severity: 'error' 
+      });
+    } finally {
+      setSendingMessage(false);
+    }
+  };
+
+  const handleDownloadReport = async (reportType) => {
+    setDownloadingReport(reportType);
+    try {
+      const { blob, filename } = await adminAPI.downloadReport(reportType);
+      
+      // Create download link
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      
+      setReportsSnackbar({ 
+        open: true, 
+        message: `${reportType.charAt(0).toUpperCase() + reportType.slice(1)} report downloaded successfully!`, 
+        severity: 'success' 
+      });
+    } catch (err) {
+      setReportsSnackbar({ 
+        open: true, 
+        message: `Failed to download ${reportType} report`, 
+        severity: 'error' 
+      });
+    } finally {
+      setDownloadingReport('');
+    }
+  };
+
+  const renderUserManagement = () => (
+    <Paper sx={{ p: 4 }}>
+      <Typography variant="h5" sx={{ mb: 2 }}>User Management</Typography>
+      <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+        <TextField
+          size="small"
+          placeholder="Search users..."
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') fetchUsers(e.target.value); }}
+          InputProps={{ startAdornment: <SearchIcon sx={{ mr: 1 }} /> }}
+          sx={{ width: 300, mr: 2 }}
+        />
+        <Button variant="outlined" onClick={() => fetchUsers(search)}>Search</Button>
       </Box>
+      {loading ? (
+        <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+          <CircularProgress />
+        </Box>
+      ) : (
+        <TableContainer component={Paper}>
+          <Table>
+            <TableHead>
+              <TableRow>
+                <TableCell>User</TableCell>
+                <TableCell>Email</TableCell>
+                <TableCell>Status</TableCell>
+                <TableCell>Joined</TableCell>
+                <TableCell>Actions</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {users.map(user => (
+                <TableRow key={user.id}>
+                  <TableCell>
+                    <Stack direction="row" alignItems="center" spacing={1}>
+                      <Avatar src={user.photo} />
+                      <Box>
+                        <Typography variant="subtitle2">{user.name || user.username}</Typography>
+                        <Typography variant="body2" color="text.secondary">{user.username}</Typography>
+                      </Box>
+                    </Stack>
+                  </TableCell>
+                  <TableCell>{user.email}</TableCell>
+                  <TableCell>
+                    <Chip
+                      label={user.is_active ? 'Active' : 'Banned'}
+                      color={user.is_active ? 'success' : 'error'}
+                      size="small"
+                    />
+                  </TableCell>
+                  <TableCell>{user.created_at ? new Date(user.created_at).toLocaleDateString() : ''}</TableCell>
+                  <TableCell>
+                    <Stack direction="row" spacing={1}>
+                      <IconButton
+                        color={user.is_active ? 'error' : 'success'}
+                        onClick={() => handleBanToggle(user.id, user.is_active)}
+                        title={user.is_active ? 'Ban User' : 'Unban User'}
+                      >
+                        {user.is_active ? <Block /> : <CheckCircle />}
+                      </IconButton>
+                    </Stack>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      )}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={4000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+      >
+        <Alert onClose={() => setSnackbar({ ...snackbar, open: false })} severity={snackbar.severity} sx={{ width: '100%' }}>
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
+    </Paper>
+  );
 
-      {/* Stats Cards */}
-      <Grid container spacing={3} sx={{ mb: 4 }}>
-        {stats.map((stat, index) => (
-          <Grid item xs={12} sm={6} md={3} key={index}>
-            <Card>
-              <CardContent>
-                <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                  <Box
-                    sx={{
-                      p: 1,
-                      borderRadius: 2,
-                      bgcolor: `${stat.color}20`,
-                      color: stat.color,
-                      mr: 2,
-                    }}
-                  >
-                    {stat.icon}
-                  </Box>
-                  <Box>
-                    <Typography variant="h4" component="div" sx={{ fontWeight: 600 }}>
-                      {stat.value}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      {stat.title}
-                    </Typography>
-                  </Box>
-                </Box>
-              </CardContent>
-            </Card>
-          </Grid>
-        ))}
-      </Grid>
+  const renderSkillModeration = () => (
+    <Paper sx={{ p: 4 }}>
+      <Typography variant="h5" sx={{ mb: 2 }}>Skill Moderation</Typography>
+      <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+        <TextField
+          size="small"
+          placeholder="Search skills..."
+          value={skillSearch}
+          onChange={e => setSkillSearch(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') fetchSkills(e.target.value); }}
+          InputProps={{ startAdornment: <SearchIcon sx={{ mr: 1 }} /> }}
+          sx={{ width: 300, mr: 2 }}
+        />
+        <Button variant="outlined" onClick={() => fetchSkills(skillSearch)}>Search</Button>
+      </Box>
+      {skillsLoading ? (
+        <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+          <CircularProgress />
+        </Box>
+      ) : (
+        <TableContainer component={Paper}>
+          <Table>
+            <TableHead>
+              <TableRow>
+                <TableCell>Skill</TableCell>
+                <TableCell>Description</TableCell>
+                <TableCell>Created</TableCell>
+                <TableCell>Actions</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {skills.map(skill => (
+                <TableRow key={skill.id}>
+                  <TableCell>{skill.name}</TableCell>
+                  <TableCell>{skill.description || '-'}</TableCell>
+                  <TableCell>{skill.created_at ? new Date(skill.created_at).toLocaleDateString() : ''}</TableCell>
+                  <TableCell>
+                    <Button
+                      color="error"
+                      variant="outlined"
+                      onClick={() => handleRejectSkill(skill.id)}
+                    >
+                      Reject
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      )}
+      <Snackbar
+        open={skillSnackbar.open}
+        autoHideDuration={4000}
+        onClose={() => setSkillSnackbar({ ...skillSnackbar, open: false })}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+      >
+        <Alert onClose={() => setSkillSnackbar({ ...skillSnackbar, open: false })} severity={skillSnackbar.severity} sx={{ width: '100%' }}>
+          {skillSnackbar.message}
+        </Alert>
+      </Snackbar>
+    </Paper>
+  );
 
-      {/* Main Content */}
-      <Card>
-        <CardContent>
-          <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
-            <Tabs value={tabValue} onChange={handleTabChange}>
-              <Tab label="User Management" />
-              <Tab label="Swap Monitoring" />
-              <Tab label="Reports" />
-              <Tab label="Platform Messages" />
-            </Tabs>
-          </Box>
+  const renderSwapMonitoring = () => (
+    <Paper sx={{ p: 4 }}>
+      <Typography variant="h5" sx={{ mb: 2 }}>Swap Monitoring</Typography>
+      <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+        <TextField
+          select
+          size="small"
+          label="Status"
+          value={swapStatus}
+          onChange={handleStatusFilter}
+          sx={{ width: 200 }}
+        >
+          <MenuItem value="">All</MenuItem>
+          <MenuItem value="pending">Pending</MenuItem>
+          <MenuItem value="accepted">Accepted</MenuItem>
+          <MenuItem value="rejected">Rejected</MenuItem>
+          <MenuItem value="completed">Completed</MenuItem>
+        </TextField>
+      </Box>
+      {swapsLoading ? (
+        <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+          <CircularProgress />
+        </Box>
+      ) : (
+        <TableContainer component={Paper}>
+          <Table>
+            <TableHead>
+              <TableRow>
+                <TableCell>From User</TableCell>
+                <TableCell>To User</TableCell>
+                <TableCell>Skills Offered</TableCell>
+                <TableCell>Skills Wanted</TableCell>
+                <TableCell>Status</TableCell>
+                <TableCell>Date</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {swaps.map(swap => (
+                <TableRow key={swap.id}>
+                  <TableCell>{swap.from_user?.name || swap.from_user?.username}</TableCell>
+                  <TableCell>{swap.to_user?.name || swap.to_user?.username}</TableCell>
+                  <TableCell>{swap.skills_offered.map(s => s.name).join(', ')}</TableCell>
+                  <TableCell>{swap.skills_wanted.map(s => s.name).join(', ')}</TableCell>
+                  <TableCell>
+                    <Chip label={swap.status} color={
+                      swap.status === 'pending' ? 'warning' :
+                      swap.status === 'accepted' ? 'success' :
+                      swap.status === 'completed' ? 'primary' :
+                      swap.status === 'rejected' ? 'error' : 'default'
+                    } size="small" />
+                  </TableCell>
+                  <TableCell>{swap.created_at ? new Date(swap.created_at).toLocaleDateString() : ''}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      )}
+      <Snackbar
+        open={swapSnackbar.open}
+        autoHideDuration={4000}
+        onClose={() => setSwapSnackbar({ ...swapSnackbar, open: false })}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+      >
+        <Alert onClose={() => setSwapSnackbar({ ...swapSnackbar, open: false })} severity={swapSnackbar.severity} sx={{ width: '100%' }}>
+          {swapSnackbar.message}
+        </Alert>
+      </Snackbar>
+    </Paper>
+  );
 
-          {tabValue === 0 && (
-            <Box>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-                <Typography variant="h6">
-                  User Management
-                </Typography>
-                <Button
-                  variant="outlined"
-                  startIcon={<Download />}
-                >
-                  Export Users
-                </Button>
-              </Box>
-
-              <TableContainer component={Paper}>
-                <Table>
-                  <TableHead>
-                    <TableRow>
-                      <TableCell>User</TableCell>
-                      <TableCell>Status</TableCell>
-                      <TableCell>Join Date</TableCell>
-                      <TableCell>Swaps</TableCell>
-                      <TableCell>Rating</TableCell>
-                      <TableCell>Actions</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {users.map((user) => (
-                      <TableRow key={user.id}>
-                        <TableCell>
-                          <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                            <Avatar sx={{ mr: 2 }}>
-                              {user.name.charAt(0)}
-                            </Avatar>
-                            <Box>
-                              <Typography variant="subtitle2">
-                                {user.name}
-                              </Typography>
-                              <Typography variant="body2" color="text.secondary">
-                                {user.email}
-                              </Typography>
-                            </Box>
-                          </Box>
-                        </TableCell>
-                        <TableCell>
-                          <Chip
-                            label={user.status.replace('_', ' ')}
-                            color={getStatusColor(user.status)}
-                            size="small"
-                          />
-                        </TableCell>
-                        <TableCell>{user.joinDate}</TableCell>
-                        <TableCell>{user.totalSwaps}</TableCell>
-                        <TableCell>
-                          <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                            <Star sx={{ color: 'warning.main', fontSize: 16, mr: 0.5 }} />
-                            {user.rating}
-                          </Box>
-                        </TableCell>
-                        <TableCell>
-                          <Stack direction="row" spacing={1}>
-                            <IconButton
-                              size="small"
-                              onClick={() => {
-                                setSelectedUser(user);
-                                setOpenUserDialog(true);
-                              }}
-                            >
-                              <Edit />
-                            </IconButton>
-                            {user.isBanned ? (
-                              <IconButton
-                                size="small"
-                                color="success"
-                                onClick={() => handleUserAction(user.id, 'unban')}
-                              >
-                                <CheckCircle />
-                              </IconButton>
-                            ) : (
-                              <IconButton
-                                size="small"
-                                color="error"
-                                onClick={() => handleUserAction(user.id, 'ban')}
-                              >
-                                <Block />
-                              </IconButton>
-                            )}
-                          </Stack>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </TableContainer>
-            </Box>
-          )}
-
-          {tabValue === 1 && (
-            <Box>
-              <Typography variant="h6" gutterBottom>
-                Swap Monitoring
-              </Typography>
-
-              <TableContainer component={Paper}>
-                <Table>
-                  <TableHead>
-                    <TableRow>
-                      <TableCell>Users</TableCell>
-                      <TableCell>Skills Exchanged</TableCell>
-                      <TableCell>Status</TableCell>
-                      <TableCell>Date</TableCell>
-                      <TableCell>Actions</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {pendingSwaps.map((swap) => (
-                      <TableRow key={swap.id}>
-                        <TableCell>
-                          <Typography variant="subtitle2">
-                            {swap.user1} ↔ {swap.user2}
-                          </Typography>
-                        </TableCell>
-                        <TableCell>
-                          <Typography variant="body2">
-                            {swap.skill1} ↔ {swap.skill2}
-                          </Typography>
-                        </TableCell>
-                        <TableCell>
-                          <Chip
-                            label={swap.status}
-                            color={getSwapStatusColor(swap.status)}
-                            size="small"
-                          />
-                        </TableCell>
-                        <TableCell>{swap.date}</TableCell>
-                        <TableCell>
-                          <IconButton size="small">
-                            <Message />
-                          </IconButton>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </TableContainer>
-            </Box>
-          )}
-
-          {tabValue === 2 && (
-            <Box>
-              <Typography variant="h6" gutterBottom>
-                User Reports
-              </Typography>
-
-              <List>
-                {reports.map((report) => (
-                  <React.Fragment key={report.id}>
-                    <ListItem>
-                      <ListItemAvatar>
-                        <Avatar sx={{ bgcolor: report.status === 'resolved' ? 'success.main' : 'warning.main' }}>
-                          <Warning />
-                        </Avatar>
-                      </ListItemAvatar>
-                      <ListItemText
-                        primary={
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <Typography variant="subtitle1">
-                              {report.type.replace('_', ' ')}
-                            </Typography>
-                            <Chip
-                              label={report.status}
-                              size="small"
-                              color={report.status === 'resolved' ? 'success' : 'warning'}
-                            />
-                          </Box>
-                        }
-                        secondary={
-                          <Box>
-                            <Typography variant="body2">
-                              Reported by: {report.reporter} | User: {report.reportedUser}
-                            </Typography>
-                            <Typography variant="body2" color="text.secondary">
-                              {report.description}
-                            </Typography>
-                            <Typography variant="caption" color="text.secondary">
-                              {report.date}
-                            </Typography>
-                          </Box>
-                        }
-                      />
-                      <Stack direction="row" spacing={1}>
-                        <Button size="small" variant="outlined">
-                          Review
-                        </Button>
-                        <Button size="small" color="error" variant="outlined">
-                          Ban User
-                        </Button>
-                      </Stack>
-                    </ListItem>
-                    <Divider />
-                  </React.Fragment>
-                ))}
-              </List>
-            </Box>
-          )}
-
-          {tabValue === 3 && (
-            <Box>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-                <Typography variant="h6">
-                  Platform Messages
-                </Typography>
-                <Button
-                  variant="contained"
-                  startIcon={<Send />}
-                  onClick={() => setOpenMessageDialog(true)}
-                >
-                  Send Message
-                </Button>
-              </Box>
-
-              <List>
-                {platformMessages.map((message) => (
-                  <React.Fragment key={message.id}>
-                    <ListItem>
-                      <ListItemAvatar>
-                        <Avatar sx={{ bgcolor: message.sent ? 'success.main' : 'warning.main' }}>
-                          <Message />
-                        </Avatar>
-                      </ListItemAvatar>
-                      <ListItemText
-                        primary={
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <Typography variant="subtitle1">
-                              {message.title}
-                            </Typography>
-                            <Chip
-                              label={message.sent ? 'Sent' : 'Draft'}
-                              size="small"
-                              color={message.sent ? 'success' : 'warning'}
-                            />
-                          </Box>
-                        }
-                        secondary={
-                          <Box>
-                            <Typography variant="body2" sx={{ mb: 1 }}>
-                              {message.content}
-                            </Typography>
-                            <Typography variant="caption" color="text.secondary">
-                              {message.date}
-                            </Typography>
-                          </Box>
-                        }
-                      />
-                      <Stack direction="row" spacing={1}>
-                        <IconButton size="small">
-                          <Edit />
-                        </IconButton>
-                        <IconButton size="small" color="error">
-                          <Delete />
-                        </IconButton>
-                      </Stack>
-                    </ListItem>
-                    <Divider />
-                  </React.Fragment>
-                ))}
-              </List>
-            </Box>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* User Detail Dialog */}
-      <Dialog open={openUserDialog} onClose={() => setOpenUserDialog(false)} maxWidth="md" fullWidth>
-        {selectedUser && (
-          <>
-            <DialogTitle>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                <Avatar>
-                  {selectedUser.name.charAt(0)}
-                </Avatar>
-                <Box>
-                  <Typography variant="h6">{selectedUser.name}</Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    {selectedUser.email}
-                  </Typography>
-                </Box>
-              </Box>
-            </DialogTitle>
-            <DialogContent>
-              <Grid container spacing={3}>
-                <Grid item xs={12} sm={6}>
-                  <Typography variant="subtitle1" gutterBottom>
-                    User Information
-                  </Typography>
-                  <Typography variant="body2">
-                    <strong>Join Date:</strong> {selectedUser.joinDate}
-                  </Typography>
-                  <Typography variant="body2">
-                    <strong>Total Swaps:</strong> {selectedUser.totalSwaps}
-                  </Typography>
-                  <Typography variant="body2">
-                    <strong>Rating:</strong> {selectedUser.rating}/5.0
-                  </Typography>
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                  <Typography variant="subtitle1" gutterBottom>
-                    Account Status
-                  </Typography>
-                  <FormControlLabel
-                    control={
-                      <Switch
-                        checked={!selectedUser.isBanned}
-                        onChange={() => handleUserAction(selectedUser.id, selectedUser.isBanned ? 'unban' : 'ban')}
-                        color="primary"
-                      />
-                    }
-                    label={selectedUser.isBanned ? 'Banned' : 'Active'}
-                  />
-                </Grid>
-              </Grid>
-            </DialogContent>
-            <DialogActions>
-              <Button onClick={() => setOpenUserDialog(false)}>
-                Close
-              </Button>
-              <Button
-                variant="contained"
-                color="error"
-                onClick={() => {
-                  handleUserAction(selectedUser.id, 'delete');
-                  setOpenUserDialog(false);
-                }}
-              >
-                Delete User
-              </Button>
-            </DialogActions>
-          </>
-        )}
-      </Dialog>
-
-      {/* Send Message Dialog */}
-      <Dialog open={openMessageDialog} onClose={() => setOpenMessageDialog(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Send Platform Message</DialogTitle>
-        <DialogContent>
-          <Stack spacing={3} sx={{ mt: 1 }}>
-            <TextField
-              fullWidth
-              label="Message Title"
-              placeholder="Enter message title..."
-            />
-            <TextField
-              fullWidth
-              multiline
-              rows={4}
-              label="Message Content"
-              placeholder="Enter your message..."
-              value={messageContent}
-              onChange={(e) => setMessageContent(e.target.value)}
-            />
-            <FormControl fullWidth>
-              <InputLabel>Message Type</InputLabel>
-              <Select label="Message Type">
-                <MenuItem value="announcement">Announcement</MenuItem>
-                <MenuItem value="maintenance">Maintenance</MenuItem>
-                <MenuItem value="feature">Feature Update</MenuItem>
-                <MenuItem value="general">General</MenuItem>
-              </Select>
-            </FormControl>
-          </Stack>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setOpenMessageDialog(false)}>
-            Cancel
-          </Button>
+  const renderPlatformMessages = () => (
+    <Paper sx={{ p: 4 }}>
+      <Typography variant="h5" sx={{ mb: 2 }}>Platform Messages</Typography>
+      <Typography color="text.secondary" sx={{ mb: 3 }}>
+        Send platform-wide messages and notifications to all users.
+      </Typography>
+      
+      <Box sx={{ maxWidth: 600 }}>
+        <TextField
+          fullWidth
+          label="Message Title"
+          value={messageTitle}
+          onChange={(e) => setMessageTitle(e.target.value)}
+          placeholder="Enter a clear, concise title for your message"
+          sx={{ mb: 3 }}
+          disabled={sendingMessage}
+        />
+        
+        <TextField
+          fullWidth
+          label="Message Body"
+          value={messageBody}
+          onChange={(e) => setMessageBody(e.target.value)}
+          placeholder="Enter your platform-wide message here..."
+          multiline
+          rows={6}
+          sx={{ mb: 3 }}
+          disabled={sendingMessage}
+        />
+        
+        <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
           <Button
             variant="contained"
-            onClick={handleSendMessage}
-            disabled={!messageContent.trim()}
+            onClick={handleSendPlatformMessage}
+            disabled={sendingMessage || !messageTitle.trim() || !messageBody.trim()}
+            startIcon={sendingMessage ? <CircularProgress size={20} /> : <Message />}
           >
-            Send Message
+            {sendingMessage ? 'Sending...' : 'Send Platform Message'}
           </Button>
-        </DialogActions>
-      </Dialog>
+          
+          {sendingMessage && (
+            <Typography variant="body2" color="text.secondary">
+              This may take a moment for large user bases...
+            </Typography>
+          )}
+        </Box>
+        
+        <Box sx={{ mt: 3, p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
+          <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
+            💡 Tips for effective platform messages:
+          </Typography>
+          <Typography variant="body2" color="text.secondary" component="div">
+            • Keep titles clear and actionable<br/>
+            • Use concise, friendly language<br/>
+            • Include important updates or announcements<br/>
+            • Avoid sending too frequently to prevent notification fatigue
+          </Typography>
+        </Box>
+      </Box>
+      
+      <Snackbar
+        open={messageSnackbar.open}
+        autoHideDuration={6000}
+        onClose={() => setMessageSnackbar({ ...messageSnackbar, open: false })}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+      >
+        <Alert onClose={() => setMessageSnackbar({ ...messageSnackbar, open: false })} severity={messageSnackbar.severity} sx={{ width: '100%' }}>
+          {messageSnackbar.message}
+        </Alert>
+      </Snackbar>
+    </Paper>
+  );
+
+  const renderReports = () => (
+    <Paper sx={{ p: 4 }}>
+      <Typography variant="h5" sx={{ mb: 2 }}>Reports</Typography>
+      <Typography color="text.secondary" sx={{ mb: 3 }}>
+        Download comprehensive reports of user activity, feedback logs, and swap statistics.
+      </Typography>
+      
+      <Box sx={{ display: 'grid', gap: 3, maxWidth: 800 }}>
+        {/* User Activity Report */}
+        <Paper sx={{ p: 3, border: '1px solid', borderColor: 'grey.200' }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+            <Box>
+              <Typography variant="h6" sx={{ mb: 1 }}>User Activity Report</Typography>
+              <Typography variant="body2" color="text.secondary">
+                Comprehensive user data including registration dates, activity status, skills, and swap statistics.
+              </Typography>
+            </Box>
+            <Button
+              variant="contained"
+              onClick={() => handleDownloadReport('users')}
+              disabled={downloadingReport === 'users'}
+              startIcon={downloadingReport === 'users' ? <CircularProgress size={20} /> : <Download />}
+            >
+              {downloadingReport === 'users' ? 'Generating...' : 'Download CSV'}
+            </Button>
+          </Box>
+          <Typography variant="body2" color="text.secondary">
+            <strong>Includes:</strong> User IDs, usernames, emails, join dates, last login, active status, 
+            skills offered/wanted counts, total swaps, completed swaps
+          </Typography>
+        </Paper>
+
+        {/* Swap Activity Report */}
+        <Paper sx={{ p: 3, border: '1px solid', borderColor: 'grey.200' }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+            <Box>
+              <Typography variant="h6" sx={{ mb: 1 }}>Swap Activity Report</Typography>
+              <Typography variant="body2" color="text.secondary">
+                Detailed swap request data including participants, skills exchanged, status, and timestamps.
+              </Typography>
+            </Box>
+            <Button
+              variant="contained"
+              onClick={() => handleDownloadReport('swaps')}
+              disabled={downloadingReport === 'swaps'}
+              startIcon={downloadingReport === 'swaps' ? <CircularProgress size={20} /> : <Download />}
+            >
+              {downloadingReport === 'swaps' ? 'Generating...' : 'Download CSV'}
+            </Button>
+          </Box>
+          <Typography variant="body2" color="text.secondary">
+            <strong>Includes:</strong> Swap IDs, from/to users, skills offered/wanted, status, 
+            creation/update dates, messages
+          </Typography>
+        </Paper>
+
+        {/* Feedback Report */}
+        <Paper sx={{ p: 3, border: '1px solid', borderColor: 'grey.200' }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+            <Box>
+              <Typography variant="h6" sx={{ mb: 1 }}>Feedback Report</Typography>
+              <Typography variant="body2" color="text.secondary">
+                User feedback and ratings from completed swaps and interactions.
+              </Typography>
+            </Box>
+            <Button
+              variant="contained"
+              onClick={() => handleDownloadReport('feedback')}
+              disabled={downloadingReport === 'feedback'}
+              startIcon={downloadingReport === 'feedback' ? <CircularProgress size={20} /> : <Download />}
+            >
+              {downloadingReport === 'feedback' ? 'Generating...' : 'Download CSV'}
+            </Button>
+          </Box>
+          <Typography variant="body2" color="text.secondary">
+            <strong>Includes:</strong> Rating IDs, swap details, user feedback, ratings, comments, timestamps
+          </Typography>
+        </Paper>
+      </Box>
+
+      {/* Report Tips */}
+      <Box sx={{ mt: 4, p: 3, bgcolor: 'grey.50', borderRadius: 1 }}>
+        <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 2 }}>
+          📊 Report Usage Tips:
+        </Typography>
+        <Typography variant="body2" color="text.secondary" component="div">
+          • <strong>User Activity:</strong> Use for user engagement analysis and growth metrics<br/>
+          • <strong>Swap Activity:</strong> Analyze platform usage patterns and success rates<br/>
+          • <strong>Feedback:</strong> Monitor user satisfaction and identify improvement areas<br/>
+          • <strong>Data Analysis:</strong> Import CSV files into Excel, Google Sheets, or analytics tools<br/>
+          • <strong>Regular Reports:</strong> Generate reports weekly/monthly for trend analysis
+        </Typography>
+      </Box>
+      
+      <Snackbar
+        open={reportsSnackbar.open}
+        autoHideDuration={4000}
+        onClose={() => setReportsSnackbar({ ...reportsSnackbar, open: false })}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+      >
+        <Alert onClose={() => setReportsSnackbar({ ...reportsSnackbar, open: false })} severity={reportsSnackbar.severity} sx={{ width: '100%' }}>
+          {reportsSnackbar.message}
+        </Alert>
+      </Snackbar>
+    </Paper>
+  );
+
+  const renderSection = () => {
+    switch (selectedSection) {
+      case 0:
+        return renderUserManagement();
+      case 1:
+        return renderSkillModeration();
+      case 2:
+        return renderSwapMonitoring();
+      case 3:
+        return renderPlatformMessages();
+      case 4:
+        return renderReports();
+      default:
+        return null;
+    }
+  };
+
+  if (unauthorized) {
+    return (
+      <Box sx={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <Paper sx={{ p: 6, textAlign: 'center' }}>
+          <Typography variant="h4" color="error" gutterBottom>
+            Unauthorized Access
+          </Typography>
+          <Typography variant="body1" color="text.secondary">
+            You do not have permission to view this page.
+          </Typography>
+        </Paper>
+      </Box>
+    );
+  }
+
+  return (
+    <Box sx={{ display: 'flex' }}>
+      <CssBaseline />
+      <AppBar position="fixed" sx={{ zIndex: (theme) => theme.zIndex.drawer + 1 }}>
+        <Toolbar>
+          <AdminPanelSettings sx={{ mr: 2 }} />
+          <Typography variant="h6" noWrap component="div">
+            Admin Dashboard
+          </Typography>
+        </Toolbar>
+      </AppBar>
+      <Drawer
+        variant="permanent"
+        sx={{
+          width: drawerWidth,
+          flexShrink: 0,
+          [`& .MuiDrawer-paper`]: { width: drawerWidth, boxSizing: 'border-box' },
+        }}
+      >
+        <Toolbar />
+        <Divider />
+      <List>
+          {sections.map((section, idx) => (
+            <ListItem
+              button
+              key={section.label}
+              selected={selectedSection === idx}
+              onClick={() => setSelectedSection(idx)}
+            >
+              <ListItemIcon>{section.icon}</ListItemIcon>
+              <ListItemText primary={section.label} />
+        </ListItem>
+          ))}
+      </List>
+      </Drawer>
+      <Box component="main" sx={{ flexGrow: 1, bgcolor: 'background.default', p: 3, minHeight: '100vh' }}>
+        <Toolbar />
+        <Container maxWidth="lg">
+          {renderSection()}
     </Container>
+      </Box>
+    </Box>
   );
 };
 

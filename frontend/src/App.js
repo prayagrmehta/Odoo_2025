@@ -2,6 +2,8 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import { CssBaseline, Box } from '@mui/material';
+import { GoogleOAuthProvider } from '@react-oauth/google';
+import { AuthProvider } from './context/AuthContext';
 import Header from './components/Header';
 import Home from './pages/Home';
 import Login from './pages/Login';
@@ -11,6 +13,7 @@ import Profile from './pages/Profile';
 import Browse from './pages/Browse';
 import AdminPanel from './pages/AdminPanel';
 import SwapRequests from './pages/SwapRequests';
+import NotificationsPage from './pages/NotificationsPage';
 
 // Create a modern theme
 const theme = createTheme({
@@ -68,26 +71,31 @@ const theme = createTheme({
 
 function App() {
   return (
-    <ThemeProvider theme={theme}>
-      <CssBaseline />
-      <Router>
-        <Box sx={{ minHeight: '100vh', backgroundColor: 'background.default' }}>
-          <Header />
-          <Box component="main" sx={{ pt: 2, pb: 4 }}>
-            <Routes>
-              <Route path="/" element={<Home />} />
-              <Route path="/login" element={<Login />} />
-              <Route path="/register" element={<Register />} />
-              <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/profile" element={<Profile />} />
-              <Route path="/browse" element={<Browse />} />
-              <Route path="/admin" element={<AdminPanel />} />
-              <Route path="/swap-requests" element={<SwapRequests />} />
-            </Routes>
-          </Box>
-        </Box>
-      </Router>
-    </ThemeProvider>
+    <GoogleOAuthProvider clientId="YOUR_GOOGLE_CLIENT_ID">
+      <AuthProvider>
+        <ThemeProvider theme={theme}>
+          <CssBaseline />
+          <Router>
+            <Box sx={{ minHeight: '100vh', backgroundColor: 'background.default' }}>
+              <Header />
+              <Box component="main" sx={{ pt: 2, pb: 4 }}>
+                <Routes>
+                  <Route path="/" element={<Home />} />
+                  <Route path="/login" element={<Login />} />
+                  <Route path="/register" element={<Register />} />
+                  <Route path="/dashboard" element={<Dashboard />} />
+                  <Route path="/profile" element={<Profile />} />
+                  <Route path="/browse" element={<Browse />} />
+                  <Route path="/admin" element={<AdminPanel />} />
+                  <Route path="/swap-requests" element={<SwapRequests />} />
+                  <Route path="/notifications" element={<NotificationsPage />} />
+                </Routes>
+              </Box>
+            </Box>
+          </Router>
+        </ThemeProvider>
+      </AuthProvider>
+    </GoogleOAuthProvider>
   );
 }
 

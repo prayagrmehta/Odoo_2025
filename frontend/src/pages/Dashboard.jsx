@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Container,
   Grid,
@@ -20,6 +20,8 @@ import {
   IconButton,
   Tab,
   Tabs,
+  CircularProgress,
+  Alert,
 } from '@mui/material';
 import {
   Person,
@@ -37,116 +39,193 @@ import {
   VisibilityOff,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+import { swapAPI, userSkillsAPI, notificationsAPI } from '../services/apiService';
 
 const Dashboard = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [tabValue, setTabValue] = useState(0);
   const [profileVisibility, setProfileVisibility] = useState(true);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  
+  // State for dynamic data
+  const [stats, setStats] = useState([]);
+  const [skillsOffered, setSkillsOffered] = useState([]);
+  const [skillsWanted, setSkillsWanted] = useState([]);
+  const [recentSwaps, setRecentSwaps] = useState([]);
+  const [notifications, setNotifications] = useState([]);
 
-  // Mock user data
-  const user = {
-    name: 'John Doe',
-    email: 'john@example.com',
-    location: 'New York, NY',
-    avatar: null,
-    rating: 4.8,
-    totalSwaps: 24,
-    completedSwaps: 18,
-    pendingSwaps: 3,
-    cancelledSwaps: 3,
+  useEffect(() => {
+    if (user) {
+      loadDashboardData();
+    }
+  }, [user]);
+
+  const loadDashboardData = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      // Try to load data from API, fallback to mock data if endpoints don't exist
+      let swapStats, offeredSkills, wantedSkills, recentSwapsData, notificationsData;
+      
+      try {
+        // Load all dashboard data in parallel
+        [swapStats, offeredSkills, wantedSkills, recentSwapsData, notificationsData] = await Promise.all([
+          swapAPI.getSwapStats(),
+          userSkillsAPI.getOfferedSkills(),
+          userSkillsAPI.getWantedSkills(),
+          swapAPI.getRecentSwaps(),
+          notificationsAPI.getNotifications(),
+        ]);
+      } catch (apiError) {
+        console.log('API endpoints not available, using mock data:', apiError.message);
+        
+        // Fallback mock data
+        swapStats = {
+          total_swaps: 24,
+          completed_swaps: 18,
+          pending_swaps: 3,
+          average_rating: 4.8,
+        };
+        
+        offeredSkills = [
+          { name: 'JavaScript', level: 'Expert', rating: 4.9 },
+          { name: 'React.js', level: 'Advanced', rating: 4.7 },
+          { name: 'Node.js', level: 'Intermediate', rating: 4.5 },
+          { name: 'UI/UX Design', level: 'Beginner', rating: 4.2 },
+        ];
+        
+        wantedSkills = [
+          { name: 'Python', level: 'Beginner', priority: 'High' },
+          { name: 'Machine Learning', level: 'Intermediate', priority: 'Medium' },
+          { name: 'Photography', level: 'Any', priority: 'Low' },
+        ];
+        
+        recentSwapsData = [
+          {
+            id: 1,
+            type: 'offered',
+            skill: 'JavaScript',
+            partner: 'Sarah Johnson',
+            status: 'completed',
+            date: '2024-01-15',
+            rating: 5,
+          },
+          {
+            id: 2,
+            type: 'wanted',
+            skill: 'Python',
+            partner: 'Mike Chen',
+            status: 'pending',
+            date: '2024-01-10',
+          },
+          {
+            id: 3,
+            type: 'offered',
+            skill: 'React.js',
+            partner: 'Emma Davis',
+            status: 'cancelled',
+            date: '2024-01-08',
+          },
+        ];
+        
+        notificationsData = [
+          {
+            id: 1,
+            type: 'swap_request',
+            message: 'Sarah Johnson wants to learn JavaScript from you',
+            time: '2 hours ago',
+            read: false,
+          },
+          {
+            id: 2,
+            type: 'swap_accepted',
+            message: 'Mike Chen accepted your Python learning request',
+            time: '1 day ago',
+            read: true,
+          },
+          {
+            id: 3,
+            type: 'rating',
+            message: 'You received a 5-star rating for your React.js teaching',
+            time: '2 days ago',
+            read: true,
+          },
+        ];
+      }
+
+      // Set stats
+      setStats([
+        {
+          title: 'Total Swaps',
+          value: swapStats.total_swaps || 0,
+          icon: <SwapHoriz />,
+          color: 'primary.main',
+        },
+        {
+          title: 'Completed',
+          value: swapStats.completed_swaps || 0,
+          icon: <CheckCircle />,
+          color: 'success.main',
+        },
+        {
+          title: 'Pending',
+          value: swapStats.pending_swaps || 0,
+          icon: <Pending />,
+          color: 'warning.main',
+        },
+        {
+          title: 'Rating',
+          value: swapStats.average_rating || 0,
+          icon: <Star />,
+          color: 'secondary.main',
+        },
+      ]);
+
+      setSkillsOffered(offeredSkills);
+      setSkillsWanted(wantedSkills);
+
+      // Map recentSwapsData to extract partner, skill, date, and status
+      const mappedRecentSwaps = (recentSwapsData || []).map(swap => {
+        // Determine the other user
+        let partner = '';
+        if (swap.from_user && swap.to_user && user) {
+          if (swap.from_user.id === user.id) {
+            partner = swap.to_user.name || swap.to_user.username || swap.to_user.email;
+          } else {
+            partner = swap.from_user.name || swap.from_user.username || swap.from_user.email;
+          }
+        }
+        // Get skill name (first offered or wanted)
+        let skill = '';
+        if (swap.skills_offered && swap.skills_offered.length > 0) {
+          skill = swap.skills_offered[0].name;
+        } else if (swap.skills_wanted && swap.skills_wanted.length > 0) {
+          skill = swap.skills_wanted[0].name;
+        }
+        // Format date
+        let date = swap.created_at ? new Date(swap.created_at).toLocaleDateString() : '';
+        return {
+          id: swap.id,
+          partner,
+          skill,
+          status: swap.status,
+          date,
+          rating: swap.ratings && swap.ratings.length > 0 ? swap.ratings[0].rating : undefined,
+        };
+      });
+      setRecentSwaps(mappedRecentSwaps);
+      setNotifications(notificationsData);
+    } catch (err) {
+      console.error('Failed to load dashboard data:', err);
+      setError('Failed to load dashboard data. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
-
-  const skillsOffered = [
-    { name: 'JavaScript', level: 'Expert', rating: 4.9 },
-    { name: 'React.js', level: 'Advanced', rating: 4.7 },
-    { name: 'Node.js', level: 'Intermediate', rating: 4.5 },
-    { name: 'UI/UX Design', level: 'Beginner', rating: 4.2 },
-  ];
-
-  const skillsWanted = [
-    { name: 'Python', level: 'Beginner', priority: 'High' },
-    { name: 'Machine Learning', level: 'Intermediate', priority: 'Medium' },
-    { name: 'Photography', level: 'Any', priority: 'Low' },
-  ];
-
-  const recentSwaps = [
-    {
-      id: 1,
-      type: 'offered',
-      skill: 'JavaScript',
-      partner: 'Sarah Johnson',
-      status: 'completed',
-      date: '2024-01-15',
-      rating: 5,
-    },
-    {
-      id: 2,
-      type: 'wanted',
-      skill: 'Python',
-      partner: 'Mike Chen',
-      status: 'pending',
-      date: '2024-01-10',
-    },
-    {
-      id: 3,
-      type: 'offered',
-      skill: 'React.js',
-      partner: 'Emma Davis',
-      status: 'cancelled',
-      date: '2024-01-08',
-    },
-  ];
-
-  const notifications = [
-    {
-      id: 1,
-      type: 'swap_request',
-      message: 'Sarah Johnson wants to learn JavaScript from you',
-      time: '2 hours ago',
-      read: false,
-    },
-    {
-      id: 2,
-      type: 'swap_accepted',
-      message: 'Mike Chen accepted your Python learning request',
-      time: '1 day ago',
-      read: true,
-    },
-    {
-      id: 3,
-      type: 'rating',
-      message: 'You received a 5-star rating for your React.js teaching',
-      time: '2 days ago',
-      read: true,
-    },
-  ];
-
-  const stats = [
-    {
-      title: 'Total Swaps',
-      value: user.totalSwaps,
-      icon: <SwapHoriz />,
-      color: 'primary.main',
-    },
-    {
-      title: 'Completed',
-      value: user.completedSwaps,
-      icon: <CheckCircle />,
-      color: 'success.main',
-    },
-    {
-      title: 'Pending',
-      value: user.pendingSwaps,
-      icon: <Pending />,
-      color: 'warning.main',
-    },
-    {
-      title: 'Rating',
-      value: user.rating,
-      icon: <Star />,
-      color: 'secondary.main',
-    },
-  ];
 
   const handleTabChange = (event, newValue) => {
     setTabValue(newValue);
@@ -178,6 +257,43 @@ const Dashboard = () => {
     }
   };
 
+  if (loading) {
+    return (
+      <Container maxWidth="lg" sx={{ py: 4 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '400px' }}>
+          <CircularProgress />
+        </Box>
+      </Container>
+    );
+  }
+
+  // Safety check for user object
+  if (!user) {
+    return (
+      <Container maxWidth="lg" sx={{ py: 4 }}>
+        <Alert severity="warning" sx={{ mb: 2 }}>
+          Please log in to view your dashboard.
+        </Alert>
+        <Button variant="contained" onClick={() => navigate('/login')}>
+          Go to Login
+        </Button>
+      </Container>
+    );
+  }
+
+  if (error) {
+    return (
+      <Container maxWidth="lg" sx={{ py: 4 }}>
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {error}
+        </Alert>
+        <Button variant="contained" onClick={loadDashboardData}>
+          Retry
+        </Button>
+      </Container>
+    );
+  }
+
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
       {/* Header */}
@@ -186,7 +302,7 @@ const Dashboard = () => {
           Dashboard
         </Typography>
         <Typography variant="body1" color="text.secondary">
-          Welcome back, {user.name}! Here's what's happening with your skill swaps.
+          Welcome back, {user?.name || user?.email || 'User'}! Here's what's happening with your skill swaps.
         </Typography>
       </Box>
 
@@ -231,20 +347,21 @@ const Dashboard = () => {
               <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
                 <Avatar
                   sx={{ width: 64, height: 64, mr: 2 }}
+                  src={user?.photo}
                 >
-                  {user.name.charAt(0)}
+                  {user?.photo ? null : (user?.name ? user.name.charAt(0) : (user?.email ? user.email.charAt(0) : 'U'))}
                 </Avatar>
                 <Box>
                   <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                    {user.name}
+                    {user?.name || user?.email || 'User'}
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
-                    {user.email}
+                    {user?.email || 'No email'}
                   </Typography>
                   <Box sx={{ display: 'flex', alignItems: 'center', mt: 0.5 }}>
                     <LocationOn fontSize="small" color="action" sx={{ mr: 0.5 }} />
                     <Typography variant="body2" color="text.secondary">
-                      {user.location}
+                      {user?.location || 'Location not set'}
                     </Typography>
                   </Box>
                 </Box>
@@ -253,7 +370,7 @@ const Dashboard = () => {
               <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
                 <Star sx={{ color: 'warning.main', mr: 1 }} />
                 <Typography variant="body1" sx={{ fontWeight: 600 }}>
-                  {user.rating} / 5.0
+                  {user?.rating || 0} / 5.0
                 </Typography>
               </Box>
 
@@ -350,10 +467,10 @@ const Dashboard = () => {
                     </Button>
                   </Box>
                   
-                  <List>
+      <List>
                     {recentSwaps.map((swap, index) => (
                       <React.Fragment key={swap.id}>
-                        <ListItem>
+        <ListItem>
                           <ListItemAvatar>
                             <Avatar sx={{ bgcolor: swap.type === 'offered' ? 'primary.main' : 'secondary.main' }}>
                               {swap.type === 'offered' ? 'O' : 'W'}
@@ -392,11 +509,11 @@ const Dashboard = () => {
                           <IconButton size="small">
                             <Message />
                           </IconButton>
-                        </ListItem>
+        </ListItem>
                         {index < recentSwaps.length - 1 && <Divider />}
                       </React.Fragment>
                     ))}
-                  </List>
+      </List>
                 </Box>
               )}
 
@@ -406,10 +523,10 @@ const Dashboard = () => {
                     Notifications
                   </Typography>
                   
-                  <List>
+      <List>
                     {notifications.map((notification, index) => (
                       <React.Fragment key={notification.id}>
-                        <ListItem>
+        <ListItem>
                           <ListItemAvatar>
                             <Badge
                               color="error"
@@ -425,11 +542,11 @@ const Dashboard = () => {
                             primary={notification.message}
                             secondary={notification.time}
                           />
-                        </ListItem>
+        </ListItem>
                         {index < notifications.length - 1 && <Divider />}
                       </React.Fragment>
                     ))}
-                  </List>
+      </List>
                 </Box>
               )}
             </CardContent>

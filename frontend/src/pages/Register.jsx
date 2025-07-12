@@ -14,6 +14,7 @@ import {
   FormControlLabel,
   Checkbox,
   Alert,
+  Snackbar,
 } from '@mui/material';
 import {
   Visibility,
@@ -26,9 +27,11 @@ import {
   Facebook,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
 const Register = () => {
   const navigate = useNavigate();
+  const { register } = useAuth();
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -42,6 +45,7 @@ const Register = () => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
 
   const handleChange = (e) => {
     const { name, value, checked } = e.target;
@@ -104,13 +108,27 @@ const Register = () => {
 
     setIsLoading(true);
     
-    // Simulate API call
     try {
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      // Mock successful registration
-      console.log('Registration successful:', formData);
-      navigate('/dashboard');
+      const userData = {
+        username: formData.email,
+        email: formData.email,
+        password: formData.password,
+        password_confirm: formData.confirmPassword,
+        first_name: formData.firstName,
+        last_name: formData.lastName,
+        location: formData.location || '',
+      };
+      
+      const result = await register(userData);
+      
+      if (result.success) {
+        setSnackbar({ open: true, message: 'Registration successful!', severity: 'success' });
+        navigate('/dashboard');
+      } else {
+        setSnackbar({ open: true, message: result.error || 'Registration failed. Please try again.', severity: 'error' });
+      }
     } catch (error) {
+      setSnackbar({ open: true, message: 'Registration failed. Please try again.', severity: 'error' });
       console.error('Registration failed:', error);
     } finally {
       setIsLoading(false);
@@ -356,6 +374,20 @@ const Register = () => {
           </Box>
         </Paper>
       </Box>
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={3000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+      >
+        <Alert 
+          onClose={() => setSnackbar({ ...snackbar, open: false })} 
+          severity={snackbar.severity}
+          sx={{ width: '100%' }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Container>
   );
 };
