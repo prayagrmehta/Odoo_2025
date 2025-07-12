@@ -17,7 +17,7 @@ Ultimately, Skill Swap fosters a decentralized learning environment driven by th
 
 ## 👥 Team Name
 
-**Tech Titans**
+**Team 1854**
 
 ---
 
