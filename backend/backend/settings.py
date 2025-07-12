@@ -34,7 +34,7 @@ DEBUG = os.getenv('DEBUG', 'False') == 'True'
 ALLOWED_HOSTS = []
 
 CORS_ALLOWED_ORIGINS = [
-    "http://localhost:5173",  # React's dev server
+    "http://localhost:3000", # React's dev server
 ]
 
 

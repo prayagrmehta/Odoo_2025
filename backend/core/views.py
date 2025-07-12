@@ -19,7 +19,17 @@ def signup(request):
     if Credentials.objects.filter(email=email).exists():
         return Response({'error': 'Email already exists'}, status=status.HTTP_400_BAD_REQUEST)
     cred = Credentials.objects.create(email=email, password=password, name=name)
-    return Response({'message': 'Signup successful', 'user_id': cred.id}, status=status.HTTP_201_CREATED)
+    # Create User for this Credentials, private by default, other fields empty/none
+    User.objects.create(
+        credentials=cred,
+        profile='public',
+        location='',
+        skills_offered=[],
+        skills_wanted=[],
+        availability='',
+        rating=0.0,
+    )
+    return Response({'message': 'Signup successful'}, status=status.HTTP_201_CREATED)
 
 @api_view(['POST'])
 def login(request):
@@ -107,7 +117,10 @@ def public_users(request):
             'availability': user.availability,
             'rating': user.rating,
         })
-    return Response(data)
+    return Response({
+        'total': users.count(),
+        'users': data
+    })
 
 @api_view(['GET'])
 def pending_requests(request):
